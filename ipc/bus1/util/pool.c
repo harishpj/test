@@ -8,6 +8,7 @@
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#include <linux/version.h>
 #include <linux/aio.h>
 #include <linux/err.h>
 #include <linux/file.h>
@@ -499,10 +500,22 @@ ssize_t bus1_pool_write_kvec(struct bus1_pool *pool,
 	offset += slice->offset;
 	iov_iter_kvec(&iter, WRITE | ITER_KVEC, iov, n_iov, total_len);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
 	old_fs = get_fs();
-	set_fs(get_ds());
+	set_fs( get_ds() );
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
+	old_fs = get_fs();
+	set_fs( KERNEL_DS );
+#else
+	old_fs = force_uaccess_begin();
+#endif
 	len = vfs_iter_write(pool->f, &iter, &offset, 0);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
 	set_fs(old_fs);
+#else
+	force_uaccess_end(old_fs);
+#endif
 
 	return (len >= 0 && len != total_len) ? -EFAULT : len;
 }

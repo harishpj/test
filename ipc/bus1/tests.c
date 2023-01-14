@@ -8,6 +8,7 @@
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#include <linux/version.h>
 #include <linux/cred.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
@@ -164,12 +165,23 @@ static void bus1_test_pool(void)
 	r = bus1_pool_alloc(&pool, &slice, 1024);
 	WARN_ON(r < 0);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
 	old_fs = get_fs();
-	set_fs(get_ds());
+	set_fs( get_ds() );
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
+	old_fs = get_fs();
+	set_fs( KERNEL_DS );
+#else
+	old_fs = force_uaccess_begin();
+#endif
 	r = bus1_pool_write_iovec(&pool, &slice, 0, &vec, 1, vec.iov_len);
 	WARN_ON(r < 0);
-	set_fs(old_fs);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
+	set_fs(old_fs);
+#else
+	force_uaccess_end(old_fs);
+#endif
 	r = bus1_pool_write_kvec(&pool, &slice, 0, &kvec, 1, kvec.iov_len);
 	WARN_ON(r < 0);
 	bus1_pool_publish(&slice);
